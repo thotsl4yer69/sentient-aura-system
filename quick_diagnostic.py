@@ -51,8 +51,9 @@ def test_hardware_discovery():
         capabilities = discovery.discover_all()
 
         logger.info(f"Found {len(capabilities)} capabilities:")
-        for cap_id, details in capabilities.items():
-            logger.info(f"  - {cap_id}: {details.get('name', 'Unknown')}")
+        for cap_id, cap in capabilities.items():
+            # HardwareCapability is a dataclass, access attributes directly
+            logger.info(f"  - {cap_id}: {cap.name} ({'✓' if cap.available else '✗'})")
 
         return True
 
