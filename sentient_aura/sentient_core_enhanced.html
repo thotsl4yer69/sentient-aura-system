@@ -1,0 +1,620 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sentient Core - Enhanced Interface</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body, html {
+            overflow: hidden;
+            background-color: #000;
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            color: #fff;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Info Panel */
+        #info {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 20px;
+            border-radius: 12px;
+            border: 2px solid #00ffff;
+            max-width: 380px;
+            font-size: 14px;
+            line-height: 1.8;
+            backdrop-filter: blur(10px);
+        }
+
+        #info .label {
+            color: #888;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            font-weight: 600;
+        }
+
+        #info .value {
+            color: #00ffff;
+            font-weight: bold;
+        }
+
+        #info b {
+            color: #00ffff;
+            font-size: 18px;
+            letter-spacing: 2px;
+        }
+
+        /* Mode Indicator */
+        #mode-indicator {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 15px 25px;
+            border-radius: 12px;
+            border: 2px solid #00ffff;
+            font-size: 18px;
+            font-weight: bold;
+            color: #00ffff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Chat Container */
+        #chatContainer {
+            position: absolute;
+            bottom: 30px;
+            left: 30px;
+            right: 30px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            pointer-events: none;
+        }
+
+        /* Message History */
+        #messageHistory {
+            height: 250px;
+            overflow-y: auto;
+            background: rgba(0, 0, 0, 0.85);
+            border: 2px solid #00ffff;
+            border-radius: 12px;
+            padding: 20px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.8;
+            color: #00ffff;
+            backdrop-filter: blur(10px);
+            pointer-events: auto;
+        }
+
+        #messageHistory::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        #messageHistory::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 4px;
+        }
+
+        #messageHistory::-webkit-scrollbar-thumb {
+            background: #00ffff;
+            border-radius: 4px;
+        }
+
+        .message {
+            margin-bottom: 15px;
+            animation: messageSlide 0.3s ease-out;
+        }
+
+        @keyframes messageSlide {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .message-sender {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+
+        .message-sender.user {
+            color: #ffd700;
+        }
+
+        .message-sender.aura {
+            color: #00ff88;
+        }
+
+        .message-text {
+            color: #ffffff;
+            padding-left: 10px;
+        }
+
+        /* Input Container */
+        #inputContainer {
+            display: flex;
+            gap: 15px;
+            align-items: stretch;
+            pointer-events: auto;
+        }
+
+        #userInput {
+            flex: 1;
+            padding: 18px 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: #00ffff;
+            border: 2px solid #00ffff;
+            border-radius: 12px;
+            font-size: 16px;
+            font-family: 'Inter', sans-serif;
+            outline: none;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        #userInput::placeholder {
+            color: rgba(0, 255, 255, 0.5);
+        }
+
+        #userInput:focus {
+            border-color: #00ff88;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+
+        #sendBtn {
+            padding: 18px 40px;
+            background: linear-gradient(135deg, #00ffff, #00ff88);
+            color: #000;
+            border: none;
+            border-radius: 12px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 255, 255, 0.4);
+        }
+
+        #sendBtn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 25px rgba(0, 255, 255, 0.6);
+        }
+
+        #sendBtn:active {
+            transform: translateY(0);
+        }
+
+        #sendBtn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* Controls */
+        #controls {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px 20px;
+            border-radius: 8px;
+            font-size: 12px;
+            color: #888;
+            text-align: right;
+            line-height: 1.6;
+        }
+
+        #controls b {
+            color: #00ffff;
+        }
+
+        /* Status Badge */
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .status-online {
+            background: rgba(0, 255, 136, 0.2);
+            color: #00ff88;
+            border: 1px solid #00ff88;
+        }
+
+        .status-offline {
+            background: rgba(255, 68, 68, 0.2);
+            color: #ff4444;
+            border: 1px solid #ff4444;
+        }
+
+        /* Connection Status */
+        #connectionStatus {
+            position: absolute;
+            top: 100px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 10px 15px;
+            border-radius: 8px;
+            border: 1px solid;
+            font-size: 13px;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Loading Animation */
+        .loading-dots::after {
+            content: '...';
+            animation: dots 1.5s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0%, 20% { content: '.'; }
+            40% { content: '..'; }
+            60%, 100% { content: '...'; }
+        }
+    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Info Panel -->
+    <div id="info">
+        <b>SENTIENT CORE</b><br>
+        <span class="label">Status:</span> <span class="value" id="statusText">Initializing<span class="loading-dots"></span></span>
+    </div>
+
+    <!-- Mode Indicator -->
+    <div id="mode-indicator">INITIALIZING</div>
+
+    <!-- Connection Status -->
+    <div id="connectionStatus" class="status-offline" style="display: none;">
+        Disconnected
+    </div>
+
+    <!-- Chat Container -->
+    <div id="chatContainer">
+        <!-- Message History -->
+        <div id="messageHistory"></div>
+
+        <!-- Input Area -->
+        <div id="inputContainer">
+            <input type="text" id="userInput"
+                   placeholder="Type your message (or use voice if available)..."
+                   autocomplete="off"
+                   maxlength="500">
+            <button id="sendBtn">SEND</button>
+        </div>
+    </div>
+
+    <!-- Controls Info -->
+    <div id="controls">
+        <b>CONTROLS</b><br>
+        Drag: Rotate • Scroll: Zoom<br>
+        Space: Reconnect • H: Toggle Help<br>
+        Enter: Send Message
+    </div>
+
+    <script async src="https://unpkg.com/es-module-shims@1.10.0/dist/es-module-shims.js"></script>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.165.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.165.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // === INITIALIZATION ===
+        let scene, camera, renderer, particles, controls;
+        let uniforms;
+        let ws;
+        let isConnected = false;
+
+        const infoDiv = document.getElementById('info');
+        const statusText = document.getElementById('statusText');
+        const modeIndicator = document.getElementById('mode-indicator');
+        const messageHistory = document.getElementById('messageHistory');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+
+        // === MESSAGE HANDLING ===
+        function addMessage(sender, text, color = '#ffffff') {
+            const msgDiv = document.createElement('div');
+            msgDiv.className = 'message';
+
+            const senderDiv = document.createElement('div');
+            senderDiv.className = `message-sender ${sender.toLowerCase()}`;
+            senderDiv.textContent = sender + ':';
+
+            const textDiv = document.createElement('div');
+            textDiv.className = 'message-text';
+            textDiv.textContent = text;
+
+            msgDiv.appendChild(senderDiv);
+            msgDiv.appendChild(textDiv);
+            messageHistory.appendChild(msgDiv);
+
+            // Auto-scroll to bottom
+            messageHistory.scrollTop = messageHistory.scrollHeight;
+        }
+
+        function sendMessage() {
+            const message = userInput.value.trim();
+
+            if (!message) return;
+            if (!isConnected) {
+                addMessage('SYSTEM', 'Not connected to Sentient Core. Attempting to reconnect...', '#ff4444');
+                connectWebSocket();
+                return;
+            }
+
+            // Add to UI immediately
+            addMessage('YOU', message, '#ffd700');
+
+            // Send to backend via WebSocket
+            try {
+                ws.send(JSON.stringify({
+                    type: 'user_message',
+                    text: message,
+                    timestamp: Date.now()
+                }));
+
+                userInput.value = '';
+                userInput.focus();
+            } catch (error) {
+                console.error('Failed to send message:', error);
+                addMessage('SYSTEM', 'Failed to send message. Connection lost.', '#ff4444');
+                isConnected = false;
+                updateConnectionStatus();
+            }
+        }
+
+        // === WEBSOCKET CONNECTION ===
+        function updateConnectionStatus() {
+            connectionStatus.style.display = 'block';
+            if (isConnected) {
+                connectionStatus.className = 'status-online';
+                connectionStatus.innerHTML = '<span class="status-badge status-online">● CONNECTED</span>';
+            } else {
+                connectionStatus.className = 'status-offline';
+                connectionStatus.innerHTML = '<span class="status-badge status-offline">● DISCONNECTED</span>';
+            }
+        }
+
+        function connectWebSocket() {
+            ws = new WebSocket("ws://localhost:8765");
+            ws.binaryType = 'arraybuffer';
+
+            ws.onopen = () => {
+                console.log("WebSocket connected");
+                isConnected = true;
+                updateConnectionStatus();
+                statusText.innerHTML = '<span class="value">CONNECTED</span>';
+                addMessage('SYSTEM', 'Connected to Sentient Core. Ready to communicate.', '#00ff88');
+            };
+
+            ws.onmessage = (event) => {
+                // Handle both binary (particle data) and JSON (messages)
+                if (event.data instanceof ArrayBuffer) {
+                    // Binary particle data - handled by existing visualization code
+                    handleBinaryParticles(event.data);
+                } else {
+                    // JSON message
+                    try {
+                        const message = JSON.parse(event.data);
+                        handleWebSocketMessage(message);
+                    } catch (e) {
+                        console.error('Failed to parse JSON message:', e);
+                    }
+                }
+            };
+
+            ws.onclose = () => {
+                console.log("WebSocket disconnected. Reconnecting in 3s...");
+                isConnected = false;
+                updateConnectionStatus();
+                statusText.innerHTML = '<span style="color: #ff4444;">DISCONNECTED<span class="loading-dots"></span></span>';
+                setTimeout(connectWebSocket, 3000);
+            };
+
+            ws.onerror = (error) => {
+                console.error("WebSocket error:", error);
+                isConnected = false;
+                updateConnectionStatus();
+            };
+        }
+
+        function handleWebSocketMessage(message) {
+            console.log('Received message:', message);
+
+            // Handle different message types
+            if (message.type === 'ai_response' || message.type === 'state_update') {
+                // AI response text
+                if (message.text) {
+                    addMessage('AURA', message.text, '#00ff88');
+                }
+
+                // Update state indicator
+                if (message.state) {
+                    modeIndicator.textContent = message.state.toUpperCase();
+                }
+
+                // Update info panel
+                let infoHTML = '<b>SENTIENT CORE</b><br>';
+                infoHTML += `<span class="label">State:</span> <span class="value">${(message.state || 'idle').toUpperCase()}</span><br>`;
+
+                if (message.world_state) {
+                    const ws = message.world_state;
+                    if (ws.system && ws.system.active_daemons) {
+                        infoHTML += `<span class="label">Daemons:</span> <span class="value">${ws.system.active_daemons.length}</span><br>`;
+                    }
+                    if (ws.environment) {
+                        if (ws.environment.temperature !== null) {
+                            infoHTML += `<span class="label">Temp:</span> <span class="value">${ws.environment.temperature.toFixed(1)}°C</span><br>`;
+                        }
+                    }
+                }
+
+                infoDiv.innerHTML = infoHTML;
+            }
+        }
+
+        function handleBinaryParticles(arrayBuffer) {
+            // Decode binary particle data (same as original implementation)
+            const HEADER_SIZE = 64;
+            const view = new DataView(arrayBuffer);
+
+            const version = view.getUint8(0);
+            const msgType = view.getUint8(1);
+            const frameId = view.getUint32(2, true);
+            const timestampMs = view.getBigUint64(6, true);
+            const particleCount = view.getUint32(14, true);
+            const fps = view.getFloat32(18, true);
+            const inferenceMs = view.getFloat32(22, true);
+            const totalMs = view.getFloat32(26, true);
+
+            const payload = new Float32Array(arrayBuffer, HEADER_SIZE);
+
+            // Update particles
+            if (particles && particles.geometry) {
+                const positionAttribute = particles.geometry.getAttribute('position');
+                if (positionAttribute && payload.length === positionAttribute.array.length) {
+                    positionAttribute.array.set(payload);
+                    positionAttribute.needsUpdate = true;
+                }
+            }
+
+            // Update info display
+            let infoHTML = '<b>SENTIENT CORE</b><br>';
+            infoHTML += '<span class="label">Mode:</span> <span class="value">CORAL TPU</span><br>';
+            infoHTML += `<span class="label">FPS:</span> <span class="value">${fps.toFixed(1)}</span><br>`;
+            infoHTML += `<span class="label">Inference:</span> <span class="value">${inferenceMs.toFixed(2)}ms</span><br>`;
+            infoHTML += `<span class="label">Particles:</span> <span class="value">${particleCount.toLocaleString()}</span><br>`;
+            infoDiv.innerHTML = infoHTML;
+
+            modeIndicator.textContent = `CORAL TPU - ${fps.toFixed(1)} FPS`;
+        }
+
+        // === EVENT LISTENERS ===
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                sendMessage();
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            if (e.key === ' ' && e.target !== userInput) {
+                e.preventDefault();
+                connectWebSocket();
+            } else if (e.key === 'h' || e.key === 'H') {
+                const controls = document.getElementById('controls');
+                controls.style.display = controls.style.display === 'none' ? 'block' : 'none';
+            }
+        });
+
+        // === THREE.JS SETUP (Original implementation) ===
+        function init() {
+            scene = new THREE.Scene();
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(0, 1, 2.5);
+
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.body.insertBefore(renderer.domElement, document.body.firstChild);
+
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.autoRotate = true;
+            controls.autoRotateSpeed = 0.2;
+            controls.target.set(0, 1.0, 0);
+
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+
+            createParticles();
+            connectWebSocket();
+            animate();
+
+            // Welcome message
+            setTimeout(() => {
+                addMessage('AURA', 'Sentient Core initialized. How can I assist you today?', '#00ff88');
+            }, 1000);
+        }
+
+        function createParticles() {
+            // Use the original particle creation from sentient_core.html
+            // (Simplified here - copy from original file for full implementation)
+            const particleCount = 100000;
+            const positions = new Float32Array(particleCount * 3);
+
+            for (let i = 0; i < particleCount; i++) {
+                const i3 = i * 3;
+                const r = 2 + Math.random() * 2;
+                const phi = Math.random() * Math.PI * 2;
+                const theta = Math.random() * Math.PI;
+                positions[i3 + 0] = r * Math.sin(theta) * Math.cos(phi);
+                positions[i3 + 1] = (r * Math.sin(theta) * Math.sin(phi)) + 1.0;
+                positions[i3 + 2] = r * Math.cos(theta);
+            }
+
+            const geometry = new THREE.BufferGeometry();
+            geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+            const material = new THREE.PointsMaterial({
+                color: 0x00ffff,
+                size: 0.02,
+                blending: THREE.AdditiveBlending,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            particles = new THREE.Points(geometry, material);
+            scene.add(particles);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        // === START ===
+        init();
+    </script>
+</body>
+</html>

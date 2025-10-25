@@ -1,0 +1,55 @@
+{
+  "config": {
+    "status": "passed",
+    "details": {
+      "llm_backends": [
+        "ollama"
+      ],
+      "search_available": false,
+      "weather_available": true,
+      "news_available": false,
+      "homeassistant_available": false,
+      "github_available": false,
+      "database_configured": true
+    }
+  },
+  "llm": {
+    "status": "failed",
+    "details": "All backends failed"
+  },
+  "search": {
+    "status": "skipped",
+    "details": "No API key configured"
+  },
+  "weather": {
+    "status": "failed",
+    "details": "Unable to fetch weather data. No API key or sensors available."
+  },
+  "homeassistant": {
+    "status": "skipped",
+    "details": "Service not available"
+  },
+  "memory": {
+    "status": "passed",
+    "details": {
+      "conversations": 1
+    }
+  },
+  "api_manager": {
+    "status": "passed",
+    "details": {
+      "health": {
+        "llm_available": true,
+        "search_available": false,
+        "weather_available": true,
+        "homeassistant_available": false,
+        "memory_available": true,
+        "total_requests": 0,
+        "failed_requests": 0,
+        "uptime": 0.04204845428466797
+      },
+      "services_tested": 2,
+      "services_passed": 0
+    }
+  }
+}

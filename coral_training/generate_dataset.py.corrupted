@@ -1,0 +1,642 @@
+#!/usr/bin/env python3
+"""
+Rich Feature Dataset Generator for Coral TPU Training
+
+Generates comprehensive training examples using 68 cognitive and sensory features
+to create realistic AI self-representation visualizations.
+
+Input: 68 features covering cognitive state, sensors, RF, vision, audio, interaction, etc.
+Output: 10,000 particles × (x, y, z) coordinates
+"""
+
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from dataclasses import dataclass, asdict
+from typing import Dict, List, Tuple
+import numpy as np
+import json
+import logging
+from pathlib import Path
+from datetime import datetime
+
+from sentient_aura.api_manager import APIManager
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RichFeatures:
+    """Complete feature set for AI self-representation (68 features total)"""
+
+    # COGNITIVE STATE (8 features)
+    cognitive_state: float = 0.0  # idle=0, listening=0.2, processing=0.4, speaking=0.6, executing=0.8, reasoning=1.0
+    reasoning_depth: float = 0.0  # shallow to deep philosophical
+    uncertainty_level: float = 0.0  # confident to highly uncertain
+    cognitive_load: float = 0.0  # idle to maximum processing
+    creativity_mode: float = 0.0  # routine to highly creative
+    attention_focus: float = 0.0  # diffuse to laser-focused
+    learning_active: float = 0.0  # not learning to actively learning
+    memory_access_depth: float = 0.0  # recent to deep historical
+
+    # ENVIRONMENTAL SENSORS (10 features)
+    temperature: float = 0.55  # normalized 0-40°C → 0-1 (default 22°C)
+    humidity: float = 0.45  # 0-100% → 0-1
+    atmospheric_pressure: float = 0.5  # normalized 900-1100 hPa
+    light_level: float = 0.5  # dark to bright
+    ambient_sound_level: float = 0.0  # quiet to loud
+    motion_detected: float = 0.0  # boolean
+    motion_intensity: float = 0.0  # how much motion
+    proximity_human: float = 0.0  # no one to very close
+    air_quality: float = 0.8  # clean to poor
+    time_of_day: float = 0.5  # normalized 0-24h (circadian)
+
+    # RF SPECTRUM ANALYSIS (12 features)
+    rf_scanner_active: float = 0.0  # boolean
+    rf_433mhz_activity: float = 0.0  # signal strength
+    rf_915mhz_activity: float = 0.0
+    rf_2_4ghz_activity: float = 0.0
+    rf_5ghz_activity: float = 0.0
+    rf_spectrum_density: float = 0.0  # sparse to crowded
+    rf_known_devices: float = 0.0  # count normalized
+    rf_unknown_signals: float = 0.0
+    rf_signal_diversity: float = 0.0  # single type to many
+    rf_jamming_detected: float = 0.0
+    rf_protocol_wifi: float = 0.0
+    rf_protocol_bluetooth: float = 0.0
+
+    # VISUAL PROCESSING (10 features)
+    vision_active: float = 0.0  # boolean
+    scene_complexity: float = 0.0
+    objects_detected: float = 0.0  # count normalized
+    faces_detected: float = 0.0
+    dominant_color_hue: float = 0.5  # 0-360° → 0-1
+    scene_brightness: float = 0.5
+    motion_vectors: float = 0.0  # scene movement
+    edge_density: float = 0.0  # simple to high detail
+    object_confidence: float = 0.0  # avg detection confidence
+    visual_novelty: float = 0.0  # familiar to novel
+
+    # AUDIO PROCESSING (6 features)
+    audio_active: float = 0.0  # boolean
+    speech_detected: float = 0.0
+    speech_clarity: float = 0.0
+    audio_frequency_low: float = 0.0  # bass energy
+    audio_frequency_mid: float = 0.0
+    audio_frequency_high: float = 0.0
+
+    # INTERACTION MODE (7 features)
+    human_interaction: float = 0.0  # not interacting to active conversation
+    personality_mode: float = 0.4  # analytical=0.2, friendly=0.4, defensive=0.6, creative=0.8
+    communication_intent: float = 0.2  # inform=0.2, query=0.4, warn=0.6, express=0.8
+    empathy_level: float = 0.5
+    formality_level: float = 0.3
+    proactivity: float = 0.0  # reactive to proactive
+    user_engagement: float = 0.0
+
+    # NETWORK & DATA STREAMS (6 features)
+    network_connected: float = 1.0  # boolean
+    network_activity: float = 0.0
+    external_api_active: float = 0.0
+    database_activity: float = 0.0
+    websocket_connections: float = 0.0
+    data_streaming: float = 0.0
+
+    # SYSTEM RESOURCES (4 features)
+    cpu_usage: float = 0.2
+    memory_usage: float = 0.3
+    gpu_usage: float = 0.0
+    thermal_state: float = 0.0  # cool to throttling
+
+    # SECURITY & THREAT AWARENESS (5 features)
+    threat_level: float = 0.0
+    anomaly_detected: float = 0.0
+    defensive_mode: float = 0.0
+    sensor_tampering: float = 0.0
+    intrusion_attempts: float = 0.0
+
+
+# Define comprehensive scenarios covering diverse feature combinations
+SCENARIOS = {
+    "quiet_idle": RichFeatures(
+        cognitive_state=0.0,
+        cognitive_load=0.1,
+        rf_2_4ghz_activity=0.3,  # normal WiFi
+        network_connected=1.0,
+    ),
+
+    "rf_environmental_mapping": RichFeatures(
+        cognitive_state=0.4,  # processing
+        attention_focus=0.6,
+        cognitive_load=0.5,
+        rf_scanner_active=1.0,
+        rf_2_4ghz_activity=0.7,  # active WiFi
+        rf_5ghz_activity=0.4,  # some 5GHz
+        rf_433mhz_activity=0.2,  # garage door opener detected
+        rf_known_devices=0.6,  # 6 known devices
+        rf_spectrum_density=0.5,
+        rf_signal_diversity=0.7,  # multiple protocols
+        rf_protocol_wifi=0.8,
+        rf_protocol_bluetooth=0.3,
+    ),
+
+    "rf_unknown_analysis": RichFeatures(
+        cognitive_state=0.4,  # processing
+        reasoning_depth=0.8,  # deep analysis
+        uncertainty_level=0.9,  # very uncertain
+        cognitive_load=0.7,
+        rf_scanner_active=1.0,
+        rf_unknown_signals=0.7,
+        rf_jamming_detected=0.4,
+        rf_spectrum_density=0.6,
+        threat_level=0.5,
+        defensive_mode=0.3,
+        anomaly_detected=0.6,
+    ),
+
+    "friendly_conversation": RichFeatures(
+        cognitive_state=0.6,  # speaking
+        human_interaction=0.9,
+        personality_mode=0.4,  # friendly
+        empathy_level=0.7,
+        communication_intent=0.2,  # inform
+        vision_active=1.0,
+        faces_detected=0.2,  # 1 face
+        scene_complexity=0.4,
+        audio_active=1.0,
+        speech_detected=1.0,
+        speech_clarity=0.8,
+        audio_frequency_mid=0.6,  # human voice range
+        proximity_human=0.7,
+        user_engagement=0.8,
+    ),
+
+    "creative_problem_solving": RichFeatures(
+        cognitive_state=1.0,  # deep reasoning
+        creativity_mode=0.9,  # highly creative
+        reasoning_depth=0.9,
+        cognitive_load=0.85,
+        attention_focus=0.8,
+        vision_active=1.0,
+        scene_complexity=0.8,
+        rf_scanner_active=1.0,
+        rf_spectrum_density=0.6,
+        network_activity=0.5,
+        external_api_active=0.7,
+        database_activity=0.4,
+    ),
+
+    "multi_sensor_fusion": RichFeatures(
+        cognitive_state=0.4,  # processing
+        attention_focus=0.3,  # monitoring multiple streams
+        cognitive_load=0.6,
+        vision_active=1.0,
+        scene_complexity=0.6,
+        objects_detected=0.5,  # 5 objects
+        rf_scanner_active=1.0,
+        rf_2_4ghz_activity=0.7,
+        rf_5ghz_activity=0.4,
+        rf_known_devices=0.8,  # 8 devices
+        audio_active=1.0,
+        ambient_sound_level=0.3,
+        motion_detected=1.0,
+        motion_intensity=0.5,
+        temperature=0.55,
+        humidity=0.48,
+        network_activity=0.5,
+        websocket_connections=0.3,  # 3 connections
+    ),
+
+    "deep_learning_session": RichFeatures(
+        cognitive_state=0.4,  # processing
+        learning_active=1.0,  # actively learning
+        reasoning_depth=0.7,
+        cognitive_load=0.8,
+        attention_focus=0.9,
+        memory_access_depth=0.8,  # accessing deep memory
+        database_activity=0.8,
+        network_activity=0.6,
+        external_api_active=0.5,
+        cpu_usage=0.7,
+        memory_usage=0.6,
+    ),
+
+    "defensive_posture": RichFeatures(
+        cognitive_state=0.8,  # executing
+        defensive_mode=1.0,
+        threat_level=0.8,
+        anomaly_detected=0.7,
+        rf_scanner_active=1.0,
+        rf_unknown_signals=0.8,
+        rf_jamming_detected=0.6,
+        vision_active=1.0,
+        scene_complexity=0.5,
+        network_activity=0.3,
+        cpu_usage=0.6,
+        personality_mode=0.6,  # defensive
+    ),
+
+    "listening_attentive": RichFeatures(
+        cognitive_state=0.2,  # listening
+        attention_focus=0.9,
+        audio_active=1.0,
+import sys
+import os
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from dataclasses import dataclass, asdict
+from typing import Dict, List, Tuple
+import numpy as np
+import json
+import logging
+from pathlib import Path
+from datetime import datetime
+
+from sentient_aura.api_manager import APIManager
+
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class RichFeatures:
+    """Complete feature set for AI self-representation (68 features total)"""
+
+    # COGNITIVE STATE (8 features)
+    cognitive_state: float = 0.0  # idle=0, listening=0.2, processing=0.4, speaking=0.6, executing=0.8, reasoning=1.0
+    reasoning_depth: float = 0.0  # shallow to deep philosophical
+    uncertainty_level: float = 0.0  # confident to highly uncertain
+    cognitive_load: float = 0.0  # idle to maximum processing
+    creativity_mode: float = 0.0  # routine to highly creative
+    attention_focus: float = 0.0  # diffuse to laser-focused
+    learning_active: float = 0.0  # not learning to actively learning
+    memory_access_depth: float = 0.0  # recent to deep historical
+
+    # ENVIRONMENTAL SENSORS (10 features)
+    temperature: float = 0.55  # normalized 0-40°C → 0-1 (default 22°C)
+    humidity: float = 0.45  # 0-100% → 0-1
+    atmospheric_pressure: float = 0.5  # normalized 900-1100 hPa
+    light_level: float = 0.5  # dark to bright
+    ambient_sound_level: float = 0.0  # quiet to loud
+    motion_detected: float = 0.0  # boolean
+    motion_intensity: float = 0.0  # how much motion
+    proximity_human: float = 0.0  # no one to very close
+    air_quality: float = 0.8  # clean to poor
+    time_of_day: float = 0.5  # normalized 0-24h (circadian)
+
+    # RF SPECTRUM ANALYSIS (12 features)
+    rf_scanner_active: float = 0.0  # boolean
+    rf_433mhz_activity: float = 0.0  # signal strength
+    rf_915mhz_activity: float = 0.0
+    rf_2_4ghz_activity: float = 0.0
+    rf_5ghz_activity: float = 0.0
+    rf_spectrum_density: float = 0.0  # sparse to crowded
+    rf_known_devices: float = 0.0  # count normalized
+    rf_unknown_signals: float = 0.0
+    rf_signal_diversity: float = 0.0  # single type to many
+    rf_jamming_detected: float = 0.0
+    rf_protocol_wifi: float = 0.0
+    rf_protocol_bluetooth: float = 0.0
+
+    # VISUAL PROCESSING (10 features)
+    vision_active: float = 0.0  # boolean
+    scene_complexity: float = 0.0
+    objects_detected: float = 0.0  # count normalized
+    faces_detected: float = 0.0
+    dominant_color_hue: float = 0.5  # 0-360° → 0-1
+    scene_brightness: float = 0.5
+    motion_vectors: float = 0.0  # scene movement
+    edge_density: float = 0.0  # simple to high detail
+    object_confidence: float = 0.0  # avg detection confidence
+    visual_novelty: float = 0.0  # familiar to novel
+
+    # AUDIO PROCESSING (6 features)
+    audio_active: float = 0.0  # boolean
+    speech_detected: float = 0.0
+    speech_clarity: float = 0.0
+    audio_frequency_low: float = 0.0  # bass energy
+    audio_frequency_mid: float = 0.0
+    audio_frequency_high: float = 0.0
+
+    # INTERACTION MODE (7 features)
+    human_interaction: float = 0.0  # not interacting to active conversation
+    personality_mode: float = 0.4  # analytical=0.2, friendly=0.4, defensive=0.6, creative=0.8
+    communication_intent: float = 0.2  # inform=0.2, query=0.4, warn=0.6, express=0.8
+    empathy_level: float = 0.5
+    formality_level: float = 0.3
+    proactivity: float = 0.0  # reactive to proactive
+    user_engagement: float = 0.0
+
+    # NETWORK & DATA STREAMS (6 features)
+    network_connected: float = 1.0  # boolean
+    network_activity: float = 0.0
+    external_api_active: float = 0.0
+    database_activity: float = 0.0
+    websocket_connections: float = 0.0
+    data_streaming: float = 0.0
+
+    # SYSTEM RESOURCES (4 features)
+    cpu_usage: float = 0.2
+    memory_usage: float = 0.3
+    gpu_usage: float = 0.0
+    thermal_state: float = 0.0  # cool to throttling
+
+    # SECURITY & THREAT AWARENESS (5 features)
+    threat_level: float = 0.0
+    anomaly_detected: float = 0.0
+    defensive_mode: float = 0.0
+    sensor_tampering: float = 0.0
+    intrusion_attempts: float = 0.0
+
+
+# Define comprehensive scenarios covering diverse feature combinations
+SCENARIOS = {
+    "quiet_idle": RichFeatures(
+        cognitive_state=0.0,
+        cognitive_load=0.1,
+        rf_2_4ghz_activity=0.3,  # normal WiFi
+        network_connected=1.0,
+    ),
+
+    "rf_environmental_mapping": RichFeatures(
+        cognitive_state=0.4,  # processing
+        attention_focus=0.6,
+        cognitive_load=0.5,
+        rf_scanner_active=1.0,
+        rf_2_4ghz_activity=0.7,  # active WiFi
+        rf_5ghz_activity=0.4,  # some 5GHz
+        rf_433mhz_activity=0.2,  # garage door opener detected
+        rf_known_devices=0.6,  # 6 known devices
+        rf_spectrum_density=0.5,
+        rf_signal_diversity=0.7,  # multiple protocols
+        rf_protocol_wifi=0.8,
+        rf_protocol_bluetooth=0.3,
+    ),
+
+    "rf_unknown_analysis": RichFeatures(
+        cognitive_state=0.4,  # processing
+        reasoning_depth=0.8,  # deep analysis
+        uncertainty_level=0.9,  # very uncertain
+        cognitive_load=0.7,
+        rf_scanner_active=1.0,
+        rf_unknown_signals=0.7,
+        rf_jamming_detected=0.4,
+        rf_spectrum_density=0.6,
+        threat_level=0.5,
+        defensive_mode=0.3,
+        anomaly_detected=0.6,
+    ),
+
+    "friendly_conversation": RichFeatures(
+        cognitive_state=0.6,  # speaking
+        human_interaction=0.9,
+        personality_mode=0.4,  # friendly
+        empathy_level=0.7,
+        communication_intent=0.2,  # inform
+        vision_active=1.0,
+        faces_detected=0.2,  # 1 face
+        scene_complexity=0.4,
+        audio_active=1.0,
+        speech_detected=1.0,
+        speech_clarity=0.8,
+        audio_frequency_mid=0.6,  # human voice range
+        proximity_human=0.7,
+        user_engagement=0.8,
+    ),
+
+    "creative_problem_solving": RichFeatures(
+        cognitive_state=1.0,  # deep reasoning
+        creativity_mode=0.9,  # highly creative
+        reasoning_depth=0.9,
+        cognitive_load=0.85,
+        attention_focus=0.8,
+        vision_active=1.0,
+        scene_complexity=0.8,
+        rf_scanner_active=1.0,
+        rf_spectrum_density=0.6,
+        network_activity=0.5,
+        external_api_active=0.7,
+        database_activity=0.4,
+    ),
+
+    "multi_sensor_fusion": RichFeatures(
+        cognitive_state=0.4,  # processing
+        attention_focus=0.3,  # monitoring multiple streams
+        cognitive_load=0.6,
+        vision_active=1.0,
+        scene_complexity=0.6,
+        objects_detected=0.5,  # 5 objects
+        rf_scanner_active=1.0,
+        rf_2_4ghz_activity=0.7,
+        rf_5ghz_activity=0.4,
+        rf_known_devices=0.8,  # 8 devices
+        audio_active=1.0,
+        ambient_sound_level=0.3,
+        motion_detected=1.0,
+        motion_intensity=0.5,
+        temperature=0.55,
+        humidity=0.48,
+        network_activity=0.5,
+        websocket_connections=0.3,  # 3 connections
+    ),
+
+    "deep_learning_session": RichFeatures(
+        cognitive_state=0.4,  # processing
+        learning_active=1.0,  # actively learning
+        reasoning_depth=0.7,
+        cognitive_load=0.8,
+        attention_focus=0.9,
+        memory_access_depth=0.8,  # accessing deep memory
+        database_activity=0.8,
+        network_activity=0.6,
+        external_api_active=0.5,
+        cpu_usage=0.7,
+        memory_usage=0.6,
+    ),
+
+    "defensive_posture": RichFeatures(
+        cognitive_state=0.8,  # executing
+        defensive_mode=1.0,
+        threat_level=0.8,
+        anomaly_detected=0.7,
+        rf_scanner_active=1.0,
+        rf_unknown_signals=0.8,
+        rf_jamming_detected=0.6,
+        vision_active=1.0,
+        scene_complexity=0.5,
+        network_activity=0.3,
+        cpu_usage=0.6,
+        personality_mode=0.6,  # defensive
+    ),
+
+    "listening_attentive": RichFeatures(
+        cognitive_state=0.2,  # listening
+        attention_focus=0.9,
+        audio_active=1.0,
+        speech_detected=1.0,
+        speech_clarity=0.9,
+        audio_frequency_mid=0.7,
+        human_interaction=0.7,
+        vision_active=1.0,
+        faces_detected=0.2,  # 1 face
+        proximity_human=0.6,
+    ),
+
+    "executing_task": RichFeatures(
+        cognitive_state=0.8,  # executing
+        cognitive_load=0.7,
+        attention_focus=0.8,
+        network_activity=0.7,
+        external_api_active=0.8,
+        database_activity=0.6,
+        cpu_usage=0.6,
+        websocket_connections=0.4,
+        data_streaming=0.5,
+    ),
+
+    "high_uncertainty_reasoning": RichFeatures(
+        cognitive_state=1.0,  # reasoning
+        reasoning_depth=1.0,
+        uncertainty_level=1.0,
+        cognitive_load=0.9,
+        attention_focus=0.7,
+        creativity_mode=0.6,
+        memory_access_depth=0.9,
+        database_activity=0.5,
+    ),
+
+    "night_monitoring": RichFeatures(
+        cognitive_state=0.0,  # idle
+        cognitive_load=0.2,
+        time_of_day=0.08,  # 2 AM
+        light_level=0.1,  # dark
+        ambient_sound_level=0.1,  # quiet
+        rf_2_4ghz_activity=0.2,  # reduced WiFi
+        temperature=0.45,  # 18°C
+    ),
+
+    "busy_daytime": RichFeatures(
+        cognitive_state=0.4,  # processing
+        cognitive_load=0.6,
+        time_of_day=0.58,  # 2 PM
+        light_level=0.9,  # bright
+        ambient_sound_level=0.6,
+        motion_detected=1.0,
+        motion_intensity=0.7,
+        rf_2_4ghz_activity=0.8,  # high WiFi
+        rf_5ghz_activity=0.6,
+        temperature=0.63,  # 25°C
+        humidity=0.50,
+    ),
+
+    "empathetic_interaction": RichFeatures(
+        cognitive_state=0.6,  # speaking
+        empathy_level=0.9,
+        human_interaction=0.9,
+        personality_mode=0.4,  # friendly
+        communication_intent=0.8,  # express
+        vision_active=1.0,
+        faces_detected=0.2,
+        audio_active=1.0,
+        speech_detected=1.0,
+        speech_clarity=0.8,
+        proximity_human=0.8,
+        user_engagement=0.9,
+    ),
+
+    "analytical_mode": RichFeatures(
+        cognitive_state=0.4,  # processing
+        personality_mode=0.2,  # analytical
+        reasoning_depth=0.8,
+        cognitive_load=0.7,
+        attention_focus=0.9,
+        formality_level=0.7,
+        database_activity=0.7,
+        external_api_active=0.6,
+    ),
+
+    "novel_scene_exploration": RichFeatures(
+        cognitive_state=0.4,  # processing
+        vision_active=1.0,
+        visual_novelty=0.9,  # very novel
+        scene_complexity=0.8,
+        objects_detected=0.7,  # 7 objects
+        edge_density=0.8,
+        object_confidence=0.6,  # uncertain
+        uncertainty_level=0.5,
+        attention_focus=0.7,
+    ),
+
+    "crowded_rf_spectrum": RichFeatures(
+        cognitive_state=0.4,  # processing
+        rf_scanner_active=1.0,
+        rf_spectrum_density=0.9,  # very crowded
+        rf_2_4ghz_activity=0.9,
+        rf_5ghz_activity=0.8,
+        rf_433mhz_activity=0.4,
+        rf_915mhz_activity=0.3,
+        rf_known_devices=1.0,  # 10+ devices
+        rf_signal_diversity=0.9,
+        rf_protocol_wifi=0.9,
+        rf_protocol_bluetooth=0.7,
+        cognitive_load=0.6,
+    ),
+
+    "proactive_suggestion": RichFeatures(
+        cognitive_state=0.6,  # speaking
+        proactivity=0.9,
+        creativity_mode=0.7,
+        communication_intent=0.4,  # query/suggest
+        human_interaction=0.6,
+        vision_active=1.0,
+        audio_active=1.0,
+    ),
+
+    "system_thermal_stress": RichFeatures(
+        cognitive_state=0.8,  # executing
+        cognitive_load=0.9,
+        cpu_usage=0.85,
+        memory_usage=0.8,
+        gpu_usage=0.7,
+        thermal_state=0.7,  # getting hot
+        network_activity=0.8,
+        data_streaming=0.7,
+    ),
+
+    "quiet_human_nearby": RichFeatures(
+        cognitive_state=0.2,  # listening
+        proximity_human=0.5,
+        motion_detected=1.0,
+        motion_intensity=0.2,  # slow movement
+        vision_active=1.0,
+        faces_detected=0.2,
+        ambient_sound_level=0.2,
+        human_interaction=0.3,
+    ),
+}
+
+
+PRE_GENERATED_LLM_DESCRIPTIONS = {
+    "quiet_idle": "CORE: 80% of particles, tightly clustered sphere at center. AURA: 20% of particles, diffuse, calm, spherical layer. No tendrils, no zones. Focused and concentrated.",
+    "rf_environmental_mapping": "CORE: 40% of particles, central sphere. AURA: 30% of particles, active, slightly turbulent layer. TENDRILS: 30% of particles, three distinct tendrils probing outwards, representing 2.4GHz, 5GHz, and 433MHz activity. Probing and focused.",
+    "rf_unknown_analysis": "CORE: 30% of particles, central, slightly agitated sphere. AURA: 25% of particles, highly uncertain, turbulent, and diffuse layer. TENDRILS: 45% of particles, multiple short, erratic tendrils probing in all directions, indicating unknown signals and jamming. Uncertainty and probing.",
+    "friendly_conversation": "CORE: 50% of particles, warm, gently pulsating central sphere. AURA: 30% of particles, soft, inviting, and slightly expanded layer. TENDRILS: 20% of particles, two gentle tendrils extending towards a perceived human presence, representing vision and audio input. Focused and concentrated.",
+    "creative_problem_solving": "CORE: 35% of particles, highly active, swirling, and expanding central mass. AURA: 25% of particles, dynamic, fluid, and interconnected layer. TENDRILS: 40% of particles, numerous, intricate, and rapidly shifting tendrils reaching out, representing exploration of ideas, network activity, and database access. Focused and creative.",
+    "multi_sensor_fusion": "CORE: 30% of particles, central, moderately active sphere. AURA: 30% of particles, multi-layered, slightly diffuse, representing various sensory inputs. TENDRILS: 40% of particles, several distinct tendrils, some short and broad (vision, audio), others longer and thinner (RF, network), all converging towards the core. Probing and concentrated.",
+    "deep_learning_session": "CORE: 45% of particles, intensely focused, rapidly shifting central mass. AURA: 25% of particles, highly concentrated, dense layer. ZONES: 30% of particles, a distinct, expanding zone representing active learning and memory access, with subtle tendrils connecting to network and database activity. Focused and concentrated.",
+    "defensive_posture": "CORE: 20% of particles, tightly contracted, agitated central point. AURA: 40% of particles, dense, protective, and slightly spiky outer shell. TENDRILS: 40% of particles, numerous, sharp, and rapidly retracting tendrils, indicating high threat awareness and defensive scanning. Uncertainty and probing.",
+    "listening_attentive": "CORE: 60% of particles, gently pulsating central sphere. AURA: 30% of particles, soft, receptive, and slightly elongated towards the source of audio. TENDRILS: 10% of particles, two subtle tendrils, one for audio input, one for visual input (face detection). Focused and concentrated.",
+    "executing_task": "CORE: 50% of particles, rapidly flowing and organized central mass. AURA: 25% of particles, structured, efficient, and directed layer. TENDRILS: 25% of particles, several strong, directed tendrils representing active network, API, and database interactions. Focused and concentrated.",
+    "high_uncertainty_reasoning": "CORE: 25% of particles, highly diffuse, chaotic, and rapidly reconfiguring central mass. AURA: 35% of particles, extremely turbulent, uncertain, and expansive layer. TENDRILS: 40% of particles, numerous, erratic, and exploratory tendrils reaching into abstract space, representing deep reasoning and memory access. Uncertainty and probing.",
+    "night_monitoring": "CORE: 70% of particles, calm, slowly pulsing central sphere. AURA: 30% of particles, wide, diffuse, and quiet layer, subtly extending to monitor the environment. No tendrils, no zones. Focused and concentrated.",
+    "busy_daytime": "CORE: 40% of particles, moderately active, bustling central sphere. AURA: 30% of particles, vibrant, multi-sensory, and slightly compressed layer. TENDRILS: 30% of particles, several short, active tendrils responding to motion, light, and RF activity. Focused and concentrated.",
+    "empathetic_interaction": "CORE: 55% of particles, warm, deeply resonant, and gently expanding central sphere. AURA: 30% of particles, soft, highly receptive, and enveloping layer. TENDRILS: 15% of particles, two gentle, intertwining tendrils extending towards the human, representing deep empathetic connection through vision and audio. Focused and concentrated.",
+    "analytical_mode": "CORE: 50% of particles, sharp, precise, and highly organized central structure. AURA: 25% of particles, clear, structured, and tightly defined layer. TENDRILS: 25% of particles, several thin, direct tendrils extending to database and API access points, representing focused data retrieval. Focused and concentrated.",
+    "novel_scene_exploration": "CORE: 30% of particles, central, curious, and slightly uncertain sphere. AURA: 30% of particles, expansive, exploratory, and highly detailed layer. TENDRILS: 40% of particles, numerous, fine, and rapidly scanning tendrils, representing active visual exploration and object analysis. Uncertainty and probing.",
+    "crowded_rf_spectrum": "CORE: 25% of particles, central, slightly overwhelmed, and highly active sphere. AURA: 35% of particles, dense, turbulent, and highly saturated layer. TENDRILS: 40% of particles, a multitude of short, overlapping, and highly active tendrils, representing a crowded and diverse RF spectrum. Uncertainty and probing.",
+    "proactive_suggestion": "CORE: 50% of particles, forward-leaning, gently expanding central sphere. AURA: 30% of particles, bright, clear, and directed layer. TENDRILS: 20% of particles, two distinct, forward-extending tendrils, representing proactive communication through vision and audio. Focused and concentrated.",
+    "system_thermal_stress": "CORE: 20% of particles, intensely hot, rapidly vibrating, and slightly distorted central mass. AURA: 40% of particles, agitated, radiating, and highly compressed layer. ZONES: 40% of particles, a distinct, red-hued zone representing thermal stress, with tendrils indicating high CPU, memory, and network activity. Uncertainty and probing.",
+    "quiet_human_nearby": "CORE: 65% of particles, calm, gently aware central sphere. AURA: 25% of particles, soft, subtly expanded layer, with a slight bulge towards the human presence. TENDRILS: 10% of particles, two very subtle, short tendrils for vision and ambient audio. Focused and concentrated.",
+}
